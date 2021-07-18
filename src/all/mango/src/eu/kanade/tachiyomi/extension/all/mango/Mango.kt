@@ -36,6 +36,32 @@ import java.io.IOException
 
 class Mango : ConfigurableSource, HttpSource() {
 
+    // parseChapterNumber
+    private fun parseCNum(cTitle: String): Float {
+        val volumeNumOccur = Regex("""(?i)(vol|volume|v).?[+-]?([0-9]*[.])?[0-9]+""")
+        val chapterNumOccur = Regex("""(?i)(chap|chapter|c).?[+-]?([0-9]*[.])?[0-9]+""")
+        val numOccur = Regex("""[+-]?([0-9]*[.])?[0-9]+""")
+
+        var name = cTitle
+
+        val chapterNumber = chapterNumOccur.find(name)?.value
+        val volumeNumber = volumeNumOccur.find(name)?.value
+        val numOccurs = numOccur.find(name)?.value
+
+        if (chapterNumber != null) {
+            var x = numOccur.find(chapterNumber)!!.value
+            return x.toFloat()
+        }
+        if (volumeNumber != null) {
+            var x = numOccur.find(volumeNumber)!!.value
+            return x.toFloat()
+        }
+        if (numOccurs != null) {
+            return numOccurs.toFloat()
+        }
+        return 0.toFloat()
+    }
+
     override fun popularMangaRequest(page: Int): Request =
         GET("$baseUrl/api/library", headersBuilder().build())
 
@@ -141,10 +167,16 @@ class Mango : ConfigurableSource, HttpSource() {
             apiCookies = ""
             throw Exception("Login Likely Failed. Try Refreshing.")
         }
+
+        var mangatitle = result["display_name"].asString.toLowerCase()
         return result["entries"].asJsonArray.mapIndexed { index, obj ->
             SChapter.create().apply {
-                chapter_number = index + 1F
-                name = "${chapter_number.toInt()} - ${obj["display_name"].asString}"
+                chapter_number = parseCNum(obj["display_name"].asString)
+                if (chapter_number == chapter_number.toInt().toFloat()) {
+                    name = "${chapter_number.toInt()} - ${obj["display_name"].asString}"
+                } else {
+                    name = "${chapter_number.toFloat()} - ${obj["display_name"].asString}"
+                }
                 url = "/page/${obj["title_id"].asString}/${obj["id"].asString}/${obj["pages"].asString}/"
                 date_upload = 1000L * obj["mtime"].asLong
             }
